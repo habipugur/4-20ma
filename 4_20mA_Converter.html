@@ -2100,9 +2100,10 @@
             }
 
             graphPadding = pad;
-            maGraphLayout.xTicks = isSmall ? 4 : 5;
-            maGraphLayout.yTicks = isSmall ? 4 : 5;
-            maGraphLayout.fontPx = isSmall ? 10 : 12;
+            // Mobile: keep grid/labels very sparse (readable)
+            maGraphLayout.xTicks = isSmall ? 2 : 5; // 4, 12, 20
+            maGraphLayout.yTicks = isSmall ? 2 : 5; // min, mid, max
+            maGraphLayout.fontPx = isSmall ? 11 : 12;
             maGraphLayout.tooltipFontPx = isSmall ? 11 : 12;
             maGraphLayout.gridLineWidth = 1;
             maGraphLayout.axisLineWidth = isSmall ? 1.5 : 2;
@@ -3807,7 +3808,8 @@
             for (let i = 0; i <= xTicks; i++) {
                 const maValue = 4 + (i * 16 / xTicks);
                 const x = graphPadding.left + (maValue - 4) / 16 * graphWidth;
-                const maLabel = (xTicks <= 4 ? maValue.toFixed(0) : maValue.toFixed(1)) + ' mA';
+                // Mobile: shorter labels to avoid overlap
+                const maLabel = (xTicks <= 2 ? maValue.toFixed(0) : (xTicks <= 4 ? maValue.toFixed(0) : maValue.toFixed(1))) + (xTicks <= 2 ? '' : ' mA');
                 ctx.fillText(maLabel, x, height - graphPadding.bottom + 4);
             }
 
