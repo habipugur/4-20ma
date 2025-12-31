@@ -2058,6 +2058,58 @@
 
         // Graph state
         let graphPadding = { top: 40, right: 60, bottom: 50, left: 70 };
+        let maGraphLayout = {
+            xTicks: 5,
+            yTicks: 5,
+            fontPx: 12,
+            tooltipFontPx: 12,
+            gridLineWidth: 1,
+            axisLineWidth: 2,
+            lineWidth: 2.5,
+            pointR: 6,
+            glowR: 18
+        };
+
+        function updateMaGraphLayout(w, h) {
+            const width = Number(w) || 0;
+            const height = Number(h) || 0;
+            const isSmall = width > 0 && width < 520;
+            const isTiny = width > 0 && width < 380;
+
+            let pad;
+            if (isTiny) {
+                pad = { top: 20, right: 14, bottom: 30, left: 40 };
+            } else if (isSmall) {
+                pad = { top: 24, right: 18, bottom: 34, left: 46 };
+            } else {
+                pad = { top: 40, right: 60, bottom: 50, left: 70 };
+            }
+
+            // Ensure we always have some drawable area
+            if (width) {
+                const minPlotW = 140;
+                const maxLeft = Math.max(30, width - minPlotW - pad.right);
+                pad.left = Math.min(pad.left, maxLeft);
+                pad.right = Math.min(pad.right, Math.max(14, width - minPlotW - pad.left));
+            }
+            if (height) {
+                const minPlotH = 120;
+                const maxTop = Math.max(18, height - minPlotH - pad.bottom);
+                pad.top = Math.min(pad.top, maxTop);
+                pad.bottom = Math.min(pad.bottom, Math.max(24, height - minPlotH - pad.top));
+            }
+
+            graphPadding = pad;
+            maGraphLayout.xTicks = isSmall ? 4 : 5;
+            maGraphLayout.yTicks = isSmall ? 4 : 5;
+            maGraphLayout.fontPx = isSmall ? 10 : 12;
+            maGraphLayout.tooltipFontPx = isSmall ? 11 : 12;
+            maGraphLayout.gridLineWidth = 1;
+            maGraphLayout.axisLineWidth = isSmall ? 1.5 : 2;
+            maGraphLayout.lineWidth = isSmall ? 2.2 : 2.5;
+            maGraphLayout.pointR = isSmall ? 5 : 6;
+            maGraphLayout.glowR = isSmall ? 14 : 18;
+        }
 
         // Hover cursor (like thermocouple graph) for the 4-20 mA chart
         let maGraphHover = { active: false, ma: null, value: null };
@@ -3603,6 +3655,7 @@
             ctx.scale(dpr, dpr);
             canvas.style.width = container.clientWidth + 'px';
             canvas.style.height = container.clientHeight + 'px';
+            updateMaGraphLayout(container.clientWidth, container.clientHeight);
         }
 
         function cssVar(name, fallback) {
@@ -3683,6 +3736,9 @@
             const width = canvas.width / (window.devicePixelRatio || 1);
             const height = canvas.height / (window.devicePixelRatio || 1);
             const theme = getCanvasTheme();
+
+            // Make layout responsive on mobile
+            updateMaGraphLayout(width, height);
             
             // Clear canvas
             ctx.clearRect(0, 0, width, height);
@@ -3694,6 +3750,8 @@
 
             const graphWidth = width - graphPadding.left - graphPadding.right;
             const graphHeight = height - graphPadding.top - graphPadding.bottom;
+            const xTicks = Math.max(2, maGraphLayout.xTicks || 5);
+            const yTicks = Math.max(2, maGraphLayout.yTicks || 5);
 
             // Draw background
             ctx.fillStyle = theme.bg;
@@ -3701,11 +3759,11 @@
 
             // Draw grid
             ctx.strokeStyle = theme.grid;
-            ctx.lineWidth = 1;
+            ctx.lineWidth = maGraphLayout.gridLineWidth;
             
             // Vertical grid lines (mA)
-            for (let i = 0; i <= 5; i++) {
-                const maValue = 4 + (i * 16 / 5);
+            for (let i = 0; i <= xTicks; i++) {
+                const maValue = 4 + (i * 16 / xTicks);
                 const x = graphPadding.left + (maValue - 4) / 16 * graphWidth;
                 ctx.beginPath();
                 ctx.moveTo(x, graphPadding.top);
@@ -3714,9 +3772,9 @@
             }
 
             // Horizontal grid lines (value)
-            for (let i = 0; i <= 5; i++) {
-                const value = min + (i / 5) * (max - min);
-                const y = height - graphPadding.bottom - (i / 5) * graphHeight;
+            for (let i = 0; i <= yTicks; i++) {
+                const value = min + (i / yTicks) * (max - min);
+                const y = height - graphPadding.bottom - (i / yTicks) * graphHeight;
                 ctx.beginPath();
                 ctx.moveTo(graphPadding.left, y);
                 ctx.lineTo(width - graphPadding.right, y);
@@ -3725,7 +3783,7 @@
 
             // Draw axes
             ctx.strokeStyle = theme.axis;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = maGraphLayout.axisLineWidth;
             
             // X axis
             ctx.beginPath();
@@ -3741,29 +3799,32 @@
 
             // Draw axis labels
             ctx.fillStyle = theme.text;
-            ctx.font = '12px sans-serif';
+            ctx.font = `${maGraphLayout.fontPx}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
 
             // X axis labels (mA)
-            for (let i = 0; i <= 5; i++) {
-                const maValue = 4 + (i * 16 / 5);
+            for (let i = 0; i <= xTicks; i++) {
+                const maValue = 4 + (i * 16 / xTicks);
                 const x = graphPadding.left + (maValue - 4) / 16 * graphWidth;
-                ctx.fillText(maValue.toFixed(1) + ' mA', x, height - graphPadding.bottom + 5);
+                const maLabel = (xTicks <= 4 ? maValue.toFixed(0) : maValue.toFixed(1)) + ' mA';
+                ctx.fillText(maLabel, x, height - graphPadding.bottom + 4);
             }
 
             // Y axis labels (value)
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
-            for (let i = 0; i <= 5; i++) {
-                const value = min + (i / 5) * (max - min);
-                const y = height - graphPadding.bottom - (i / 5) * graphHeight;
-                ctx.fillText(value.toFixed(1), graphPadding.left - 10, y);
+            const rangeAbs = Math.abs((max || 0) - (min || 0));
+            const valDp = rangeAbs < 1 ? 2 : rangeAbs < 10 ? 1 : 0;
+            for (let i = 0; i <= yTicks; i++) {
+                const value = min + (i / yTicks) * (max - min);
+                const y = height - graphPadding.bottom - (i / yTicks) * graphHeight;
+                ctx.fillText(value.toFixed(valDp), graphPadding.left - 8, y);
             }
 
             // Draw linear line
             ctx.strokeStyle = theme.accent;
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = maGraphLayout.lineWidth;
             ctx.beginPath();
             const startX = graphPadding.left;
             const startY = height - graphPadding.bottom;
@@ -3803,19 +3864,19 @@
 
                     // point
                     // glow
-                    const glow = ctx.createRadialGradient(hoverX, hoverY, 0, hoverX, hoverY, 18);
+                    const glow = ctx.createRadialGradient(hoverX, hoverY, 0, hoverX, hoverY, maGraphLayout.glowR);
                     glow.addColorStop(0, `rgba(${theme.accentRgb}, 0.95)`);
                     glow.addColorStop(0.5, `rgba(${theme.accentRgb}, 0.35)`);
                     glow.addColorStop(1, `rgba(${theme.accentRgb}, 0)`);
                     ctx.fillStyle = glow;
                     ctx.beginPath();
-                    ctx.arc(hoverX, hoverY, 18, 0, Math.PI * 2);
+                    ctx.arc(hoverX, hoverY, maGraphLayout.glowR, 0, Math.PI * 2);
                     ctx.fill();
 
                     // point
                     ctx.fillStyle = theme.accent;
                     ctx.beginPath();
-                    ctx.arc(hoverX, hoverY, 6, 0, Math.PI * 2);
+                    ctx.arc(hoverX, hoverY, maGraphLayout.pointR, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.strokeStyle = theme.text;
                     ctx.lineWidth = 2;
@@ -3824,11 +3885,11 @@
                     // tooltip
                     const text1 = `${hoverMa.toFixed(2)} mA`;
                     const text2 = `${hoverValue.toFixed(2)} ${targetUnitSelect.value}`;
-                    ctx.font = '12px sans-serif';
+                    ctx.font = `${maGraphLayout.tooltipFontPx}px sans-serif`;
                     const w1 = ctx.measureText(text1).width;
                     const w2 = ctx.measureText(text2).width;
                     const boxW = Math.max(w1, w2) + 18;
-                    const boxH = 40;
+                    const boxH = (maGraphLayout.fontPx <= 10 ? 36 : 40);
 
                     let bx = hoverX + 12;
                     let by = hoverY - boxH - 12;
@@ -3851,7 +3912,7 @@
                     ctx.fillStyle = theme.accent;
                     ctx.fillText(text1, bx + 9, by + 6);
                     ctx.fillStyle = theme.text;
-                    ctx.fillText(text2, bx + 9, by + 22);
+                    ctx.fillText(text2, bx + 9, by + (boxH <= 36 ? 20 : 22));
                 }
             }
 
@@ -3882,7 +3943,7 @@
                     ctx.stroke();
                     ctx.setLineDash([]);
 
-                    const glow = ctx.createRadialGradient(pinX, pinY, 0, pinX, pinY, 22);
+                    const glow = ctx.createRadialGradient(pinX, pinY, 0, pinX, pinY, maGraphLayout.glowR + 4);
                     glow.addColorStop(0, `rgba(${theme.accentRgb}, 0.80)`);
                     glow.addColorStop(0.6, `rgba(${theme.accentRgb}, 0.25)`);
                     glow.addColorStop(1, `rgba(${theme.accentRgb}, 0)`);
